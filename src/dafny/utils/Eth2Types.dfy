@@ -74,8 +74,8 @@ module Eth2Types {
         |   Bitvector(xl: seq<bool>)
         |   Bytes(bs: seq<byte>)
         |   List(l:seq<RawSerialisable>, t:Tipe, limit: nat)
-        |   Set(s:seq<RawSerialisable>, t:Tipe, limit: nat)
-        |   Map(s:seq<RawSerialisable>, t:Tipe, limit: nat)
+        |   Set(s:seq<RawSerialisable>, t:Tipe, limit: nat)        // Set structure that utilises a seq<>, takes a type tag argument 't' and a natural number 'limit'
+        |   Map(m:seq<(nat, RawSerialisable)>, t:Tipe, limit: nat) // Map structure that utilises a seq<> to store pairs of nat and Rawserialisable
         |   Vector(v:seq<RawSerialisable>)
         |   Container(fl: seq<RawSerialisable>)
 
@@ -131,6 +131,10 @@ module Eth2Types {
                 && (forall i | 0 <= i < |l| :: wellTyped(l[i]))                                   
                 && forall i | 0 <= i < |l| :: typeOf(l[i]) == t 
 
+            case Set
+
+            case Map
+ 
             case Vector(v) =>   
                 //  Vectors must have less than limit elements, and the type of the elements is welltyped and constant.
                 |v| > 0
