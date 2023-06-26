@@ -74,6 +74,8 @@ module Eth2Types {
         |   Bitvector(xl: seq<bool>)
         |   Bytes(bs: seq<byte>)
         |   List(l:seq<RawSerialisable>, t:Tipe, limit: nat)
+        |   Set(s:seq<RawSerialisable>, t:Tipe, limit: nat)
+        |   Map(s:seq<RawSerialisable>, t:Tipe, limit: nat)
         |   Vector(v:seq<RawSerialisable>)
         |   Container(fl: seq<RawSerialisable>)
 
