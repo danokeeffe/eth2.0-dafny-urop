@@ -131,9 +131,17 @@ module Eth2Types {
                 && (forall i | 0 <= i < |l| :: wellTyped(l[i]))                                   
                 && forall i | 0 <= i < |l| :: typeOf(l[i]) == t 
 
-            case Set
+            case Set(s, t, limit) =>
+                 // The size of a set must be less than or equal to the value of 'limit'
+                 // Each element in the set must meet the constraints of wellTyped()
+                 // Each type in the set must be the same type, each element must be the same type as 't'
+                 // Each element in the set must be unique, so two elements at index i and j where i != j must not be equal
+                 |s| <= limit 
+                 && (forall i | 0 <= i < |s| :: wellTyped(s[i]))
+                 && (forall i | 0 <= i < |s| :: typeOf(s[i]) == t)
+                 && (forall i,j | 0 <= i < |s| && 0 <= j < |s| && i != j :: s[i] != s[j])
 
-            case Map
+            case Map(m, t, limit) => true
  
             case Vector(v) =>   
                 //  Vectors must have less than limit elements, and the type of the elements is welltyped and constant.
