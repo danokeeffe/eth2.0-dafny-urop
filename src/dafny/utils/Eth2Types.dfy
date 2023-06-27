@@ -141,7 +141,15 @@ module Eth2Types {
                  && (forall i | 0 <= i < |s| :: typeOf(s[i]) == t)
                  && (forall i,j | 0 <= i < |s| && 0 <= j < |s| && i != j :: s[i] != s[j])
 
-            case Map(m, t, limit) => true
+            case Map(m, t, limit) =>
+                // The size of the map must be less than or equal to the value of 'limit'
+                // Each key in the map should be unique
+                // Each value in the map must meet the constraints of wellTyped()
+                // Each value in the map must be one of the types defined under 'Tipe'
+                |m| <= limit 
+                && (forall i, j | 0 <= i < |m| && 0 <= j < |m| && i != j :: m[i].0 != m[j].0)
+                && (forall i | 0 <= i < |m| :: wellTyped(m[i].1))
+                && (forall i | 0 <= i < |m| :: typeOf(m[i].1) == t)
  
             case Vector(v) =>   
                 //  Vectors must have less than limit elements, and the type of the elements is welltyped and constant.
@@ -277,6 +285,10 @@ module Eth2Types {
 
                 case List(l, t, limit) =>   List_(t, limit)
 
+                case Set(s, t, limit) => true                
+
+                case Map(m, t, limit) => true
+                
                 case Vector(v) => Vector_(typeOf(v[0]),|v|)
     }
 
