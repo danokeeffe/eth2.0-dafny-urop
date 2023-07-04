@@ -59,8 +59,8 @@ module SSZ {
             case Uint64(_) => 8
             case Uint128(_) => 16 
             case Uint256(_) => 32
-            case Set(s, t, limit) => if |s| > 0 then |s| * sizeOf(s[0]) else 0
-            case Map(m, t, limit) => if |m| > 0 then |m| * (4 + sizeOf(m[0].1)) else 0
+            case Set(s, t, limit) => if |s| > 0 then |s| * sizeOf(s[0]) else 0         // If the set is not empty then the size is the number of elements in the set multiplied by the size of each element
+            case Map(m, t, limit) => if |m| > 0 then |m| * (4 + sizeOf(m[0].1)) else 0 // If the map is not empty then the size is the number of elements in the map multiplied by 4 (Map keys are uint32 which is 4 bytes) + the size of the values
     }
 
     /** default.
@@ -96,6 +96,10 @@ module SSZ {
                 case Bitvector_(len) => Bitvector(timeSeq(false,len))
 
                 case Bytes_(len) => Bytes(timeSeq(0,len))
+
+                case Set_(t: Tipe, limit: nat) =>  Set([], t, limit)         // Set has a default value of empty Set 
+
+                case Map_(k: Tipe, v: Tipe, limit: nat) => Map([], t, limit) // Map has a default value of empty Map
     }
 
     /** Serialise.
