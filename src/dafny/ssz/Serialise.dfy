@@ -59,6 +59,8 @@ module SSZ {
             case Uint64(_) => 8
             case Uint128(_) => 16 
             case Uint256(_) => 32
+            case Set(s, t, limit) => if |s| > 0 then |s| * sizeOf(s[0]) else 0
+            case Map(m, t, limit) => if |m| > 0 then |m| * (4 + sizeOf(m[0].1)) else 0
     }
 
     /** default.
