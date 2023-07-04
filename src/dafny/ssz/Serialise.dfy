@@ -140,6 +140,8 @@ module SSZ {
             case List(l,_,_) => serialiseSeqOfBasics(l)
 
             case Vector(v) => serialiseSeqOfBasics(v)
+
+            case Set(s, t, limit) => serialiseSeqOfBasics(s) // Serialise the elements of the set by using serialiseSeqOfBasics
     }
 
     /**
