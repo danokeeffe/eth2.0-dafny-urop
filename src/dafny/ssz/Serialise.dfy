@@ -113,6 +113,10 @@ module SSZ {
         requires s.Vector? ==> match s case Vector(v) => isBasicTipe(typeOf(v[0]))
         requires s.Set? ==> match s case Set(s,_,_) => forall i | 0 <= i < |s| :: isBasicTipe(typeOf(s[i])) &&
                                                        forall i,j | 0 <= i < |s| && 0 <= j < |s| :: typeOf(s[i]) == typeOf(s[j])
+        requires s.Map? ==> match s case Map(m,t,_) => (forall i, j | 0 <= i < |m| && 0 <= j < |m| && i != j :: m[i].0 != m[j].0) && 
+                                                       (forall i | 0 <= i < |m| :: wellTyped(m[i].1)) &&
+                                                       (forall i | 0 <= i < |m| :: typeOf(m[i].1) == t)
+
         decreases s
     {
         //  Equalities between upper bounds of uintk types and powers of two 
@@ -143,8 +147,10 @@ module SSZ {
 
             case Vector(v) => serialiseSeqOfBasics(v)
 
-            case Set(s, t, limit) => serialiseSeqOfBasics(s) // Serialise the elements of the set by using serialiseSeqOfBasics
-    }
+            case Set(s, t, limit) => serialiseSeqOfBasics(s) // Serialise the elements of the Set by using serialiseSeqOfBasics
+    
+            case Map(m, t, limit) => serialiseMap(m) // Serialise the key and values of the map using custom serialiseMap function    
+    } 
 
     /**
      * Serialise a sequence of basic `Serialisable` values
