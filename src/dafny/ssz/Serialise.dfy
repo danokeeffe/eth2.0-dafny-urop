@@ -111,6 +111,8 @@ module SSZ {
         requires  typeOf(s) != Container_
         requires s.List? ==> match s case List(_,t,_) => isBasicTipe(t)
         requires s.Vector? ==> match s case Vector(v) => isBasicTipe(typeOf(v[0]))
+        requires s.Set? ==> match s case Set(s,_,_) => forall i | 0 <= i < |s| :: isBasicTipe(typeOf(s[i])) &&
+                                                       forall i,j | 0 <= i < |s| && 0 <= j < |s| :: typeOf(s[i]) == typeOf(s[j])
         decreases s
     {
         //  Equalities between upper bounds of uintk types and powers of two 
@@ -163,7 +165,6 @@ module SSZ {
             serialise(s[0]) + 
             serialiseSeqOfBasics(s[1..])
     }
-
 
     /** Deserialise. 
      *  
@@ -322,7 +323,6 @@ module SSZ {
             case Uint256(n) =>  involution(n as nat, 32);
 
             case Bytes(_) => // Thanks Dafny
-        
     }
 
     /**
