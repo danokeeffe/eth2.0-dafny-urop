@@ -16,6 +16,7 @@ include "../utils/NativeTypes.dfy"
 include "../utils/NonNativeTypes.dfy"
 include "../utils/Eth2Types.dfy"
 include "../utils/Helpers.dfy"
+include "../utils/MathHelpers.dfy"
 include "IntSeDes.dfy"
 include "BoolSeDes.dfy"
 include "BitListSeDes.dfy"
@@ -37,7 +38,8 @@ module SSZ {
     import opened BitListSeDes
     import opened BitVectorSeDes
     import opened Helpers
-    import opened Constants    
+    import opened Constants  
+    import opened MathHelpers  
 
     /** SizeOf.
      *
@@ -113,9 +115,9 @@ module SSZ {
         requires s.Vector? ==> match s case Vector(v) => isBasicTipe(typeOf(v[0]))
         requires s.Set? ==> match s case Set(s,_,_) => forall i | 0 <= i < |s| :: isBasicTipe(typeOf(s[i])) &&
                                                        forall i,j | 0 <= i < |s| && 0 <= j < |s| :: typeOf(s[i]) == typeOf(s[j])
-        requires s.Map? ==> match s case Map(m,t,_) => (forall i, j | 0 <= i < |m| && 0 <= j < |m| && i != j :: m[i].0 != m[j].0) && 
-                                                       (forall i | 0 <= i < |m| :: wellTyped(m[i].1)) &&
-                                                       (forall i | 0 <= i < |m| :: typeOf(m[i].1) == t)
+        requires s.Map? ==> match s case Map(m,t,_) => forall i, j | 0 <= i < |m| && 0 <= j < |m| && i != j :: m[i].0 != m[j].0 && 
+                                                       forall i | 0 <= i < |m| :: wellTyped(m[i].1) &&
+                                                       forall i | 0 <= i < |m| :: typeOf(m[i].1) == t
 
         decreases s
     {
@@ -170,6 +172,32 @@ module SSZ {
         else
             serialise(s[0]) + 
             serialiseSeqOfBasics(s[1..])
+    }
+
+
+   /**
+    * Serialise a map with uint32 keys and RawSerialisable keys
+    * 
+    * @param m Sequence of key,value tuple values 
+    * @returns A sequence of bytes encoding 'm'
+    */
+    function method serialiseMap(m: seq<(uint32, RawSerialisable)>): seq<byte>
+        requires |m| >= 0
+        ensures |m| == 0 ==> |serialiseMap(m)| == 0
+        ensures |m| > 0 ==> |serialiseMap(m)| > 0
+        requires (forall i, j | 0 <= i < |m| && 0 <= j < |m| && i != j :: m[i].0 != m[j].0)
+        requires (forall i | 0 <= i < |m| :: wellTyped(m[i].1))
+        decreases m
+    {
+        if |m| == 0 then              
+            []
+        else 
+        var key   := m[0].0;
+        var value := m[0].1;
+        assert (key as nat) < power2(32);
+        var keyBytes := uintSe(key as nat, 4);
+        var valueBytes := serialise(value);
+        keyBytes + valueBytes + serialiseMap(m[1..])
     }
 
     /** Deserialise. 
