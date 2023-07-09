@@ -115,10 +115,12 @@ module SSZ {
         requires s.Vector? ==> match s case Vector(v) => isBasicTipe(typeOf(v[0]))
         requires s.Set? ==> match s case Set(s,_,_) => forall i | 0 <= i < |s| :: isBasicTipe(typeOf(s[i])) &&
                                                        forall i,j | 0 <= i < |s| && 0 <= j < |s| :: typeOf(s[i]) == typeOf(s[j])
-        requires s.Map? ==> match s case Map(m,t,_) => forall i, j | 0 <= i < |m| && 0 <= j < |m| && i != j :: m[i].0 != m[j].0 && 
-                                                       forall i | 0 <= i < |m| :: wellTyped(m[i].1) &&
-                                                       forall i | 0 <= i < |m| :: typeOf(m[i].1) == t
-
+        requires s.Map? ==> match s case Map(m,t,_) => forall i, j | 0 <= i < |m| && 0 <= j < |m| && i != j :: m[i].0 != m[j].0 && // Each key is unique
+                                                       forall i | 0 <= i < |m| :: wellTyped(m[i].1) &&                             // Each value is wellTyped
+                                                       forall i | 0 <= i < |m| :: typeOf(m[i].1) == t &&                           // The type of each value is t
+                                                       forall i | 0 <= i < |m| :: typeOf(m[i].1) != Container_ &&                  // Values of the Map are not containers
+                                                       forall i | 0 <= i < |m| :: isBasicTipe(typeOf(m[i].1))                      // The type of each value is BasicTipe
+                                
         decreases s
     {
         //  Equalities between upper bounds of uintk types and powers of two 
@@ -151,7 +153,7 @@ module SSZ {
 
             case Set(s, t, limit) => serialiseSeqOfBasics(s) // Serialise the elements of the Set by using serialiseSeqOfBasics
     
-            case Map(m, t, limit) => serialiseMap(m) // Serialise the key and values of the map using custom serialiseMap function    
+            case Map(m, t, limit) => serialiseMap(m)         // Serialise the key and values of the map using custom serialiseMap function    
     } 
 
     /**
@@ -182,11 +184,12 @@ module SSZ {
     * @returns A sequence of bytes encoding 'm'
     */
     function method serialiseMap(m: seq<(uint32, RawSerialisable)>): seq<byte>
-        requires |m| >= 0
-        ensures |m| == 0 ==> |serialiseMap(m)| == 0
-        ensures |m| > 0 ==> |serialiseMap(m)| > 0
-        requires (forall i, j | 0 <= i < |m| && 0 <= j < |m| && i != j :: m[i].0 != m[j].0)
-        requires (forall i | 0 <= i < |m| :: wellTyped(m[i].1))
+        requires |m| >= 0                                                                       // Size of Map must be greater than or equal to 0
+        ensures |m| == 0 ==> |serialiseMap(m)| == 0                                             // If the Map size is 0 then the output size of serialiseMap() is 0
+        ensures |m| > 0 ==> |serialiseMap(m)| > 0                                               // If the Map size is greater than 0 then the output size of serialiseMap() is greater than 0
+        requires (forall i, j | 0 <= i < |m| && 0 <= j < |m| && i != j :: m[i].0 != m[j].0)     // Each key in the Map is unique
+        requires (forall i | 0 <= i < |m| :: wellTyped(m[i].1))                                 // Each value in the Map is well typed
+        requires forall i | 0 <= i < |m| :: isBasicTipe(typeOf(m[i].1)) && typeOf(m[i].1) != Container_  // Each value in the Map is BasicType and not a container type
         decreases m
     {
         if |m| == 0 then              
@@ -194,10 +197,10 @@ module SSZ {
         else 
         var key   := m[0].0;
         var value := m[0].1;
-        assert (key as nat) < power2(32);
-        var keyBytes := uintSe(key as nat, 4);
-        var valueBytes := serialise(value);
-        keyBytes + valueBytes + serialiseMap(m[1..])
+        assert (key as nat) < power2(32);             // Explicitly check that the key is within the allowable range for a 32-bit unsigned integer
+        var keyBytes := uintSe(key as nat, 4);        // Serialise key
+        var valueBytes := serialise(value);           // Serialise value
+        keyBytes + valueBytes + serialiseMap(m[1..])  // Concatenate serialised key and value and recursively do the same for all key value pairs
     }
 
     /** Deserialise. 
