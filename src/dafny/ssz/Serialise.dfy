@@ -113,13 +113,13 @@ module SSZ {
         requires  typeOf(s) != Container_
         requires s.List? ==> match s case List(_,t,_) => isBasicTipe(t)
         requires s.Vector? ==> match s case Vector(v) => isBasicTipe(typeOf(v[0]))
-        requires s.Set? ==> match s case Set(s,_,_) => forall i | 0 <= i < |s| :: isBasicTipe(typeOf(s[i])) &&
-                                                       forall i,j | 0 <= i < |s| && 0 <= j < |s| :: typeOf(s[i]) == typeOf(s[j])
-        requires s.Map? ==> match s case Map(m,t,_) => forall i, j | 0 <= i < |m| && 0 <= j < |m| && i != j :: m[i].0 != m[j].0 && // Each key is unique
-                                                       forall i | 0 <= i < |m| :: wellTyped(m[i].1) &&                             // Each value is wellTyped
-                                                       forall i | 0 <= i < |m| :: typeOf(m[i].1) == t &&                           // The type of each value is t
-                                                       forall i | 0 <= i < |m| :: typeOf(m[i].1) != Container_ &&                  // Values of the Map are not containers
-                                                       forall i | 0 <= i < |m| :: isBasicTipe(typeOf(m[i].1))                      // The type of each value is BasicTipe
+        requires s.Set? ==> match s case Set(s,_,_) => (forall i | 0 <= i < |s| :: isBasicTipe(typeOf(s[i]))) &&
+                                                       (forall i,j | 0 <= i < |s| && 0 <= j < |s| :: typeOf(s[i]) == typeOf(s[j]))
+        requires s.Map? ==> match s case Map(m,t,_) => (forall i, j | 0 <= i < |m| && 0 <= j < |m| && i != j :: m[i].0 != m[j].0) && // Each key is unique
+                                                       (forall i | 0 <= i < |m| :: wellTyped(m[i].1)) &&                             // Each value is wellTyped
+                                                       (forall i | 0 <= i < |m| :: typeOf(m[i].1) == t) &&                           // The type of each value is t
+                                                       (forall i | 0 <= i < |m| :: typeOf(m[i].1) != Container_) &&                  // Values of the Map are not containers
+                                                       (forall i | 0 <= i < |m| :: isBasicTipe(typeOf(m[i].1)))                      // The type of each value is BasicTipe
                                 
         decreases s
     {
@@ -189,7 +189,7 @@ module SSZ {
         ensures |m| > 0 ==> |serialiseMap(m)| > 0                                               // If the Map size is greater than 0 then the output size of serialiseMap() is greater than 0
         requires (forall i, j | 0 <= i < |m| && 0 <= j < |m| && i != j :: m[i].0 != m[j].0)     // Each key in the Map is unique
         requires (forall i | 0 <= i < |m| :: wellTyped(m[i].1))                                 // Each value in the Map is well typed
-        requires forall i | 0 <= i < |m| :: isBasicTipe(typeOf(m[i].1)) && typeOf(m[i].1) != Container_  // Each value in the Map is BasicType and not a container type
+        requires (forall i | 0 <= i < |m| :: isBasicTipe(typeOf(m[i].1)) && typeOf(m[i].1) != Container_)  // Each value in the Map is BasicType and not a container type
         decreases m
     {
         if |m| == 0 then              
@@ -202,7 +202,7 @@ module SSZ {
         var valueBytes := serialise(value);           // Serialise value
         keyBytes + valueBytes + serialiseMap(m[1..])  // Concatenate serialised key and value and recursively do the same for all key value pairs
     }
-
+/*
     /** Deserialise. 
      *  
      *  @param  xs  A sequence of bytes.
@@ -386,4 +386,5 @@ module SSZ {
             }
         }
     }
+    */
 }
