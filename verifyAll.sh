@@ -17,6 +17,7 @@ mystatus=()
 
 defaultverifconf="/dafnyVerify:1 /compile:0  /noCheating:1"
 
+dafnycmd="/Users/UJAC001/.vscode/extensions/dafny-lang.ide-vscode-3.0.7/out/resources/3.13.1/github/dafny/dafny"
 
 # help and usage
 help()
@@ -60,7 +61,7 @@ do
   echo -e "${BLUE}Processing $entry with config $config${NC}"
   myfiles+=($entry)
   # Run dafny with a config
-  dafny $config $entry 
+  $dafnycmd $config $entry 
   # echo "$result"
   if [ $? -eq 0 ] 
   then
