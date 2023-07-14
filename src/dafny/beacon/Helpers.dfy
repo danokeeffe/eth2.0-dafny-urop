@@ -1922,6 +1922,8 @@ module BeaconHelpers {
                       );
 
         Validator(
+                d.data.pubkey,
+                FAR_FUTURE_EPOCH,
                 d.data.pubkey, 
                 effective_balance as Gwei, 
                 false, 
