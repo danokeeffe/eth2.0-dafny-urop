@@ -35,6 +35,8 @@ module BeaconChainTypes {
     import opened Validators
     import opened AttestationsTypes
 
+    const MAX_BLOCK_PUBKEY_CHANGES: int := 16;
+
     datatype PubKeyChange = PubKeyChange ( // PubKeyChange class representation- new in Revoke
         validator_index: ValidatorIndex,
         from_bls_pubkey: BLSPubkey,
@@ -47,7 +49,7 @@ module BeaconChainTypes {
         signature: BLSSignature
     )
 
-    
+
     // Misc dependencies
 
     /**
@@ -156,12 +158,13 @@ module BeaconChainTypes {
         attester_slashings: seq<AttesterSlashing>,
         attestations: seq<Attestation>,
         deposits: seq<Deposit>,
-        voluntary_exits: seq<VoluntaryExit>
+        voluntary_exits: seq<VoluntaryExit>,
+        pubkey_changes: seq<SignedPubKeyChange> // Length should be less than or equal to MAX_BLOCK_PUBKEY_CHANGES
     )
 
     /** The zeroed (default) block body. */
     const DEFAULT_BLOCK_BODY := BeaconBlockBody(
-        DEFAULT_BYTES32, DEFAULT_ETH1DATA, [], [], [], [], []
+        DEFAULT_BYTES32, DEFAULT_ETH1DATA, [], [], [], [], [], []
     )
 
     /**
