@@ -301,6 +301,13 @@ module ProcessOperationsSpec {
         s5
     }
 
+    function updatePubKeyChanges(s: BeaconState, signed_pubkey_change: SignedPubKeyChange) : BeaconState
+         requires signed_pubkey_change.message.validator_index as int < |s.validators| 
+    {
+         s
+    }
+
+
     /**
      *  The functional equivalent of process_proposer_slashing.
      *  
