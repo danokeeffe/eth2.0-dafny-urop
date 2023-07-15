@@ -34,8 +34,14 @@ module BeaconChainTypes {
     import opened Helpers
     import opened Validators
     import opened AttestationsTypes
-    
 
+    datatype PubKeyChange = PubKeyChange ( // Adding PubKeyChange - new in Revoke
+        validator_index: ValidatorIndex,
+        from_bls_pubkey: BLSPubkey,
+        pubkey: BLSPubkey,
+        new_pubkey: BLSPubkey
+    )
+    
     // Misc dependencies
 
     /**
