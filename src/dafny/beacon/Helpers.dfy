@@ -1925,6 +1925,7 @@ module BeaconHelpers {
                 d.data.pubkey,
                 FAR_FUTURE_EPOCH,
                 d.data.pubkey, 
+                d.data.withdrawal_credentials,
                 effective_balance as Gwei, 
                 false, 
                 FAR_FUTURE_EPOCH, 
