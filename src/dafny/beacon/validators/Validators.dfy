@@ -45,7 +45,7 @@ module Validators {
         new_pubkey: BLSPubkey,                  // Adding new_pubkey field - This is included in Revoke class Validator()
         pubkey_change_epoch: Epoch,             // Adding pubkey_change_epoch - This is included in Revoke class Validator()
         pubkey: BLSPubkey,
-        // withdrawal_credentials: Hash,
+        withdrawal_credentials: Hash,           // Uncommenting line, Hash is equivalent to Bytes32
         effective_balance: Gwei,
         slashed: bool,
         activation_eligibility_epoch: Epoch,
@@ -56,8 +56,10 @@ module Validators {
     
     /** The default Validator. */
     const DEFAULT_VALIDATOR := Validator(
-        DEFAULT_BYTES48, FAR_FUTURE_EPOCH, DEFAULT_BYTES48, 0, false, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH    
-        // Adding DEFAULT_BYTES48 to new_pubkey argument and FAR_FUTURE_EPOCH to pubkey_change_epoch argument
+        DEFAULT_BYTES48, FAR_FUTURE_EPOCH, DEFAULT_BYTES48, DEFAULT_BYTES32, 0, false, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH    
+        // Added DEFAULT_BYTES48 to new_pubkey argument
+        // Added FAR_FUTURE_EPOCH to pubkey_change_epoch argument
+        // Added DEFAULT_BYTES32 to withdrawal_credentials
     )
     
      /**
