@@ -307,7 +307,12 @@ module ProcessOperationsSpec {
          requires is_active_validator(s.validators[signed_pubkey_change.message.validator_index], get_current_epoch(s)) // 2nd assert in Revoke mainnet.py
          requires s.validators[signed_pubkey_change.message.validator_index].exitEpoch == FAR_FUTURE_EPOCH // 3rd assert in Revoke mainnet.py
          requires !s.validators[signed_pubkey_change.message.validator_index].slashed  // 4th assert in Revoke mainnet.py
-         //requires s.validators[signed_pubkey_change.message.validator_index].withdrawal_credentials[0] == BLS_WITHDRAW_PREFIX
+         requires 
+         
+         match s.validators[signed_pubkey_change.message.validator_index].withdrawal_credentials {
+          case Bytes(s) => s[0] == 123
+         }
+          
     {
          s
     }
