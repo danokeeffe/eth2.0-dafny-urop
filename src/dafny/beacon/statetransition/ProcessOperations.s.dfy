@@ -302,7 +302,6 @@ module ProcessOperationsSpec {
     }
 
     function updatePubKeyChanges(s: BeaconState, signed_pubkey_change: SignedPubKeyChange) : BeaconState
-         requires minimumActiveValidators(s)
          requires signed_pubkey_change.message.validator_index as int < |s.validators|    // 1st assert in Revoke mainnet.py
          requires is_active_validator(s.validators[signed_pubkey_change.message.validator_index], get_current_epoch(s)) // 2nd assert in Revoke mainnet.py
          requires s.validators[signed_pubkey_change.message.validator_index].exitEpoch == FAR_FUTURE_EPOCH // 3rd assert in Revoke mainnet.py
@@ -320,7 +319,8 @@ module ProcessOperationsSpec {
         // Used a nested "match" here since "s.validators[signed_pubkey_change.message.validator_index].withdrawal_credentials" type is Bytes32
         // Also hash(signed_pubkey_change.message.from_bls_pubkey) type is Bytes32 and both need to be indexed
 
-          
+        requires s.validators[signed_pubkey_change.message.validator_index].pubkey == signed_pubkey_change.message.pubkey // 7th assert in Revoke mainnet.py
+        requires |s.validators[signed_pubkey_change.message.validator_index].prev_pubkeys| < MAX_VALIDATOR_PUBKEY_CHANGES // 8th assert in Revoke mainnet.py
     {
          s
     }

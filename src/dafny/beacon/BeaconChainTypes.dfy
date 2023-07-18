@@ -37,6 +37,7 @@ module BeaconChainTypes {
 
     const MAX_BLOCK_PUBKEY_CHANGES: int := 16;
     const BLS_WITHDRAWAL_PREFIX: uint8 := 0x00;
+    const MAX_VALIDATOR_PUBKEY_CHANGES: int := 16;
 
     datatype PubKeyChange = PubKeyChange ( // PubKeyChange class representation- new in Revoke
         validator_index: ValidatorIndex,
