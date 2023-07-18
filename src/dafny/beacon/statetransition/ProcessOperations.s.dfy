@@ -310,8 +310,16 @@ module ProcessOperationsSpec {
          requires 
          
          match s.validators[signed_pubkey_change.message.validator_index].withdrawal_credentials {
-          case Bytes(s) => s[0] == BeaconChainTypes.BLS_WITHDRAWAL_PREFIX   // Adding 5th assert in Revoke mainnet.py
-         }
+               case Bytes(s) => match hash(signed_pubkey_change.message.from_bls_pubkey) {
+                                      case Bytes(hashedPubkey) =>
+                                                 s[0] == BeaconChainTypes.BLS_WITHDRAWAL_PREFIX && s[|s|-1] == hashedPubkey[|hashedPubkey|-1] 
+                                }
+        }
+
+        // Adding 5th and 6th assert in Revoke mainnet.py
+        // Used a nested "match" here since "s.validators[signed_pubkey_change.message.validator_index].withdrawal_credentials" type is Bytes32
+        // Also hash(signed_pubkey_change.message.from_bls_pubkey) type is Bytes32 and both need to be indexed
+
           
     {
          s
