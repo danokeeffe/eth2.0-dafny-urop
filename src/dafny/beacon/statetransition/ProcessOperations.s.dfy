@@ -310,7 +310,7 @@ module ProcessOperationsSpec {
          requires 
          
          match s.validators[signed_pubkey_change.message.validator_index].withdrawal_credentials {
-          case Bytes(s) => s[0] == 123
+          case Bytes(s) => s[0] == BeaconChainTypes.BLS_WITHDRAWAL_PREFIX   // Adding 5th assert in Revoke mainnet.py
          }
           
     {
