@@ -1931,13 +1931,14 @@ module BeaconHelpers {
                 FAR_FUTURE_EPOCH,
                 d.data.withdrawal_credentials,
                 d.data.pubkey,
-                FAR_FUTURE_EPOCH
+                FAR_FUTURE_EPOCH,
+                []
         )
     }
     
     /** The default Validator. */
     const DEFAULT_VALIDATOR := Validator(
-        DEFAULT_BYTES48, 0, false, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, DEFAULT_BYTES32, DEFAULT_BYTES48, FAR_FUTURE_EPOCH
+        DEFAULT_BYTES48, 0, false, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, DEFAULT_BYTES32, DEFAULT_BYTES48, FAR_FUTURE_EPOCH, []
         // Added DEFAULT_BYTES48 to new_pubkey argument
         // Added FAR_FUTURE_EPOCH to pubkey_change_epoch argument
         // Added DEFAULT_BYTES32 to withdrawal_credentials
