@@ -321,6 +321,8 @@ module ProcessOperationsSpec {
 
         requires s.validators[signed_pubkey_change.message.validator_index].pubkey == signed_pubkey_change.message.pubkey // 7th assert in Revoke mainnet.py
         requires |s.validators[signed_pubkey_change.message.validator_index].prev_pubkeys| < MAX_VALIDATOR_PUBKEY_CHANGES // 8th assert in Revoke mainnet.py
+        requires (forall i | 0 <= i < |s.validators[signed_pubkey_change.message.validator_index].prev_pubkeys| :: s.validators[signed_pubkey_change.message.validator_index].prev_pubkeys[i] != signed_pubkey_change.message.new_pubkey)  // 9th assert in Revoke mainnet.py
+        
     {
          s
     }
