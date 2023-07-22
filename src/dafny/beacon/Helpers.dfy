@@ -1340,7 +1340,7 @@ module BeaconHelpers {
                 * BASE_REWARD_FACTOR as nat
                 / integer_square_root(total_balance) as nat 
                 / BASE_REWARDS_PER_EPOCH as nat;
-        AssumeNoGweiOverflow(br);
+        AssumeNoGweiOverflow(br as nat);
         
         br as Gwei 
     }
