@@ -38,7 +38,8 @@ module BeaconChainTypes {
     const MAX_BLOCK_PUBKEY_CHANGES: int := 16;
     const BLS_WITHDRAWAL_PREFIX: uint8 := 0x00;
     const MAX_VALIDATOR_PUBKEY_CHANGES: int := 16;
-    const DOMAIN_PUBKEY_CHANGE : DomainType := Bytes([0x0B,0,0,0]); // 0x0B000000
+    const DOMAIN_PUBKEY_CHANGE: DomainType := Bytes([0x0B,0,0,0]); // 0x0B000000
+    const PUBKEY_CHANGE_DELAY: Epoch := 0;
 
     datatype PubKeyChange = PubKeyChange ( // PubKeyChange class representation- new in Revoke
         validator_index: ValidatorIndex,

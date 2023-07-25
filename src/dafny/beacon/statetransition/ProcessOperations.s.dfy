@@ -25,7 +25,6 @@ include "../Helpers.s.dfy"
 include "../Helpers.p.dfy"
 include "ProcessOperations.p.dfy"
 
-
 /**
  * Process operations functional specification.
  */
@@ -301,7 +300,7 @@ module ProcessOperationsSpec {
         s5
     }
 
-    function updatePubKeyChanges(s: BeaconState, signed_pubkey_change: SignedPubKeyChange) : BeaconState
+    method updatePubKeyChanges(s: BeaconState, signed_pubkey_change: SignedPubKeyChange) returns (state: BeaconState)
          requires signed_pubkey_change.message.validator_index as int < |s.validators|    // 1st assert in Revoke mainnet.py
          requires is_active_validator(s.validators[signed_pubkey_change.message.validator_index], get_current_epoch(s)) // 2nd assert in Revoke mainnet.py
          requires s.validators[signed_pubkey_change.message.validator_index].exitEpoch == FAR_FUTURE_EPOCH // 3rd assert in Revoke mainnet.py
@@ -322,11 +321,60 @@ module ProcessOperationsSpec {
         requires s.validators[signed_pubkey_change.message.validator_index].pubkey == signed_pubkey_change.message.pubkey // 7th assert in Revoke mainnet.py
         requires |s.validators[signed_pubkey_change.message.validator_index].prev_pubkeys| < MAX_VALIDATOR_PUBKEY_CHANGES // 8th assert in Revoke mainnet.py
         requires (forall i | 0 <= i < |s.validators[signed_pubkey_change.message.validator_index].prev_pubkeys| :: s.validators[signed_pubkey_change.message.validator_index].prev_pubkeys[i] != signed_pubkey_change.message.new_pubkey)  // 9th assert in Revoke mainnet.py
-        
+        //requires bls.Verify(signed_pubkey_change.message.from_bls_pubkey, compute_signing_root(signed_pubkey_change.message, get_domain(s, DOMAIN_PUBKEY_CHANGE)), signed_pubkey_change.signature)
+
+        requires 0 <= signed_pubkey_change.message.validator_index as int < |s.validators|                                    // Precondition to fix initiate_pubkey_change error
+        requires s.validators[signed_pubkey_change.message.validator_index].pubkey != signed_pubkey_change.message.new_pubkey // Precondition to fix initiate_pubkey_change error
     {
-         s
+        var newState: BeaconState := initiate_pubkey_change(s, signed_pubkey_change.message.validator_index, signed_pubkey_change.message.new_pubkey);
+        return newState;
     }
 
+method initiate_pubkey_change(s: BeaconState, index: ValidatorIndex, new_pubkey: BLSPubkey) returns (newState: BeaconState)
+    requires 0 <= index as int < |s.validators|
+    requires s.validators[index].pubkey != new_pubkey
+{
+    var new_validator: Validator := Validator (    // Making new Validator since s.validators[index] is immutable
+        s.validators[index].pubkey,
+        s.validators[index].effective_balance,
+        s.validators[index].slashed,
+        s.validators[index].activation_eligibility_epoch,
+        s.validators[index].activation_epoch,
+        s.validators[index].exitEpoch,
+        s.validators[index].withdrawable_epoch,
+        s.validators[index].withdrawal_credentials,
+        new_pubkey,                                 // Updated field
+        get_current_epoch(s) + PUBKEY_CHANGE_DELAY, // Updated field
+        s.validators[index].prev_pubkeys      
+    );
+
+    var new_validators: seq<Validator> := s.validators[0..index] + [new_validator] + s.validators[index+1..]; // Making new s.validators[]
+    // Create seq<Validators> of objects from 0-index, concat new_validators to it, then add objects from index+1 to end
+
+    newState := BeaconState ( // Make new beacon state object since BeaconState is also immutable
+        s.genesis_time,
+        s.slot,
+        s.latest_block_header,
+        s.block_roots,
+        s.state_roots,
+        s.historical_roots,
+        s.eth1_data,
+        s.eth1_data_votes,
+        s.eth1_deposit_index,
+        new_validators,  // Updated validators
+        s.balances,
+        s.randao_mixes,
+        s.slashings,
+        s.previous_epoch_attestations,
+        s.current_epoch_attestations,
+        s.justification_bits,
+        s.previous_justified_checkpoint,
+        s.current_justified_checkpoint,
+        s.finalised_checkpoint
+    );
+
+    return newState;
+}
 
     /**
      *  The functional equivalent of process_proposer_slashing.
