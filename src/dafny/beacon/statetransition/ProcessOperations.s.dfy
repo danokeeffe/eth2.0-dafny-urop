@@ -300,6 +300,34 @@ module ProcessOperationsSpec {
         s5
     }
 
+
+    method updatePubKeyChangesSeq(s: BeaconState, signedPubKeyChanges: seq<SignedPubKeyChange>) returns (finalState: BeaconState)
+        requires forall spc :: spc in signedPubKeyChanges ==> 
+        0 <= spc.message.validator_index as int < |s.validators|
+        && spc.message.validator_index as int < |s.validators|
+        && is_active_validator(s.validators[spc.message.validator_index], get_current_epoch(s))
+        && s.validators[spc.message.validator_index].exitEpoch == FAR_FUTURE_EPOCH
+        && !s.validators[spc.message.validator_index].slashed
+        && match s.validators[spc.message.validator_index].withdrawal_credentials {
+            case Bytes(s) => match hash(spc.message.from_bls_pubkey) {
+                case Bytes(hashedPubkey) =>
+                    s[0] == BeaconChainTypes.BLS_WITHDRAWAL_PREFIX && s[|s|-1] == hashedPubkey[|hashedPubkey|-1]
+            }
+        }
+        && s.validators[spc.message.validator_index].pubkey == spc.message.pubkey
+        && |s.validators[spc.message.validator_index].prev_pubkeys| < MAX_VALIDATOR_PUBKEY_CHANGES
+        && (forall i | 0 <= i < |s.validators[spc.message.validator_index].prev_pubkeys| :: s.validators[spc.message.validator_index].prev_pubkeys[i] != spc.message.new_pubkey)
+        && s.validators[spc.message.validator_index].pubkey != spc.message.new_pubkey
+        decreases |signedPubKeyChanges|
+    {  
+        if |signedPubKeyChanges| == 0 {
+            finalState := s;
+        } else {
+            var updatedState := updatePubKeyChanges(s, signedPubKeyChanges[0]);
+            finalState := updatePubKeyChangesSeq(updatedState, signedPubKeyChanges[1..]);
+        }
+    }
+
     method updatePubKeyChanges(s: BeaconState, signed_pubkey_change: SignedPubKeyChange) returns (state: BeaconState)
          requires signed_pubkey_change.message.validator_index as int < |s.validators|    // 1st assert in Revoke mainnet.py
          requires is_active_validator(s.validators[signed_pubkey_change.message.validator_index], get_current_epoch(s)) // 2nd assert in Revoke mainnet.py
@@ -330,51 +358,51 @@ module ProcessOperationsSpec {
         return newState;
     }
 
-method initiate_pubkey_change(s: BeaconState, index: ValidatorIndex, new_pubkey: BLSPubkey) returns (newState: BeaconState)
-    requires 0 <= index as int < |s.validators|
-    requires s.validators[index].pubkey != new_pubkey
-{
-    var new_validator: Validator := Validator (    // Making new Validator since s.validators[index] is immutable
-        s.validators[index].pubkey,
-        s.validators[index].effective_balance,
-        s.validators[index].slashed,
-        s.validators[index].activation_eligibility_epoch,
-        s.validators[index].activation_epoch,
-        s.validators[index].exitEpoch,
-        s.validators[index].withdrawable_epoch,
-        s.validators[index].withdrawal_credentials,
-        new_pubkey,                                 // Updated field
-        get_current_epoch(s) + PUBKEY_CHANGE_DELAY, // Updated field
-        s.validators[index].prev_pubkeys      
-    );
+    method initiate_pubkey_change(s: BeaconState, index: ValidatorIndex, new_pubkey: BLSPubkey) returns (newState: BeaconState)
+        requires 0 <= index as int < |s.validators|
+        requires s.validators[index].pubkey != new_pubkey
+    {
+        var new_validator: Validator := Validator (    // Making new Validator since s.validators[index] is immutable
+            s.validators[index].pubkey,
+            s.validators[index].effective_balance,
+            s.validators[index].slashed,
+            s.validators[index].activation_eligibility_epoch,
+            s.validators[index].activation_epoch,
+            s.validators[index].exitEpoch,
+            s.validators[index].withdrawable_epoch,
+            s.validators[index].withdrawal_credentials,
+            new_pubkey,                                 // Updated field
+            get_current_epoch(s) + PUBKEY_CHANGE_DELAY, // Updated field
+            s.validators[index].prev_pubkeys      
+        );
 
-    var new_validators: seq<Validator> := s.validators[0..index] + [new_validator] + s.validators[index+1..]; // Making new s.validators[]
-    // Create seq<Validators> of objects from 0-index, concat new_validators to it, then add objects from index+1 to end
+        var new_validators: seq<Validator> := s.validators[0..index] + [new_validator] + s.validators[index+1..]; // Making new s.validators[]
+        // Create seq<Validators> of objects from 0-index, concat new_validators to it, then add objects from index+1 to end
 
-    newState := BeaconState ( // Make new beacon state object since BeaconState is also immutable
-        s.genesis_time,
-        s.slot,
-        s.latest_block_header,
-        s.block_roots,
-        s.state_roots,
-        s.historical_roots,
-        s.eth1_data,
-        s.eth1_data_votes,
-        s.eth1_deposit_index,
-        new_validators,  // Updated validators
-        s.balances,
-        s.randao_mixes,
-        s.slashings,
-        s.previous_epoch_attestations,
-        s.current_epoch_attestations,
-        s.justification_bits,
-        s.previous_justified_checkpoint,
-        s.current_justified_checkpoint,
-        s.finalised_checkpoint
-    );
+        newState := BeaconState ( // Make new beacon state object since BeaconState is also immutable
+            s.genesis_time,
+            s.slot,
+            s.latest_block_header,
+            s.block_roots,
+            s.state_roots,
+            s.historical_roots,
+            s.eth1_data,
+            s.eth1_data_votes,
+            s.eth1_deposit_index,
+            new_validators,  // Updated validators
+            s.balances,
+            s.randao_mixes,
+            s.slashings,
+            s.previous_epoch_attestations,
+            s.current_epoch_attestations,
+            s.justification_bits,
+            s.previous_justified_checkpoint,
+            s.current_justified_checkpoint,
+            s.finalised_checkpoint
+        );
 
-    return newState;
-}
+        return newState;
+    }
 
     /**
      *  The functional equivalent of process_proposer_slashing.
