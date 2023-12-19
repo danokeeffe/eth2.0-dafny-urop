@@ -677,4 +677,39 @@ module ProcessOperations {
         s' := initiate_validator_exit(s, voluntary_exit.validator_index);
     }
 
+
+
+    method process_pubkey_changes(s: BeaconState, bb: BeaconBlockBody)  returns (s' : BeaconState)  
+        requires |s.validators| == |s.balances|
+        requires minimumActiveValidators(s)
+        requires isValidPubKeyChanges(s, bb)
+
+        ensures s' == updatePubKeyChanges(s, bb.pubkey_changes)
+    {
+        var i := 0;
+        s' := s;
+
+        assert isValidPubKeyChanges(s, bb);
+        assert s' == updatePubKeyChanges(s, bb.pubkey_changes[..i]);
+        assert s'.slot == s.slot;
+        assert s'.latest_block_header == s.latest_block_header;
+        assert |s'.validators| == |s'.balances|;
+        
+        while i < |bb.pubkey_changes| 
+            decreases |bb.pubkey_changes| - i
+
+            invariant 0 <= i <= |bb.pubkey_changes|
+            invariant s' == updatePubKeyChanges(s, bb.pubkey_changes[..i])
+            invariant s'.slot == s.slot
+            invariant s'.latest_block_header == s.latest_block_header
+        {
+            //VEHelperLemma3(bb.voluntary_exits[..i+1]);
+            assert 1 <= |bb.pubkey_changes|; 
+            //seqInitLast<SignedPubKeyChange>(bb.pubkey_changes, i);
+            assert bb.pubkey_changes[..i+1] == bb.pubkey_changes[..i] + [bb.pubkey_changes[i]];
+            s' := process_pubkey_change(s', bb.pubkey_changes[i]);
+            i := i + 1;
+        }
+        assert i == |bb.pubkey_changes|;
+    }
 }
