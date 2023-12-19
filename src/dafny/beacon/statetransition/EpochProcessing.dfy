@@ -190,7 +190,29 @@ module EpochProcessing {
                             )
                         )
                     );
-
+        
+        s' := process_pubkey_change_updates(s');
+        assert s' == updatePubKeyChanges(
+                        updateParticipationRecords(
+                            updateHistoricalRoots(
+                                updateRandaoMixes(
+                                    updateSlashingsReset(
+                                        updateEffectiveBalance(
+                                            updateEth1DataReset(
+                                                updateSlashings(
+                                                    updateRegistry(
+                                                        updateRAndP(
+                                                            updateJustificationAndFinalisation(s)
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    );
         assert s' == updateEpoch(s);
         return s';
     }
@@ -798,4 +820,32 @@ module EpochProcessing {
         );
     }
     
+    method process_pubkey_change_updates(s: BeaconState) returns (s' : BeaconState)
+        requires |s.validators| == |s.balances|
+        requires is_valid_state_epoch_attestations(s)
+
+        ensures |s.validators| == |s.balances|
+        ensures s' == updatePubKeyChanges(s)
+        ensures is_valid_state_epoch_attestations(s')
+    {
+
+        s' := s;
+        var i := 0;
+        while i < |s'.validators|
+            invariant  |s.validators| == |s.balances| ==|s'.balances| == |s'.validators|
+            invariant i <= |s'.validators| == |s'.balances| 
+        {
+            var validator := s.validators[i];
+            if validator.pubkey != validator.new_pubkey {
+                if validator.pubkey_change_epoch == get_current_epoch(s') {
+                    validator := validator.(pubkey := validator.new_pubkey,
+                                            pubkey_change_epoch := FAR_FUTURE_EPOCH);
+                    s' := s'.( validators := s'.validators[i := validator]);
+                }
+            }
+            i := i + 1;
+        } 
+     
+    }
+
 }

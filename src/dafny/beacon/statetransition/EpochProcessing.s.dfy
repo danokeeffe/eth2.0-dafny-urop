@@ -63,16 +63,18 @@ module EpochProcessingSpec {
             var s1 := updateFinalisedCheckpoint(updateJustification(s), s);
             assert is_valid_state_epoch_attestations(s1);
             assert s1 == updateJustificationAndFinalisation(s);
-            updateEpoch(s) == updateParticipationRecords(
-                                updateHistoricalRoots(
-                                    updateRandaoMixes(
-                                        updateSlashingsReset(
-                                            updateEffectiveBalance(
-                                                updateEth1DataReset(
-                                                    updateSlashings(
-                                                        updateRegistry(
-                                                            updateRAndP(
-                                                                updateJustificationAndFinalisation(s)
+            updateEpoch(s) == updatePubKeyChanges(
+                                updateParticipationRecords(
+                                    updateHistoricalRoots(
+                                        updateRandaoMixes(
+                                            updateSlashingsReset(
+                                                updateEffectiveBalance(
+                                                    updateEth1DataReset(
+                                                        updateSlashings(
+                                                            updateRegistry(
+                                                                updateRAndP(
+                                                                    updateJustificationAndFinalisation(s)
+                                                                )
                                                             )
                                                         )
                                                     )
@@ -231,7 +233,30 @@ module EpochProcessingSpec {
                         )
                     );
         
-        s10
+        var s11 := updatePubKeyChanges(s10);
+        assert s11 == updatePubKeyChanges( 
+                        updateParticipationRecords(
+                            updateHistoricalRoots(
+                                updateRandaoMixes(
+                                    updateSlashingsReset(
+                                        updateEffectiveBalance(
+                                            updateEth1DataReset(
+                                                updateSlashings(
+                                                    updateRegistry(
+                                                        updateRAndP(
+                                                            updateJustificationAndFinalisation(s)
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    );
+        
+        s11
     }
 
     //  Specifications of justification and finalisation of a state and forward to future slot.
@@ -1376,4 +1401,47 @@ module EpochProcessingSpec {
         )
     }
 
+
+    function {:vcs_split_on_every_assert} updatePubKeyChanges(s: BeaconState) : BeaconState
+        requires |s.validators| == |s.balances|
+        requires is_valid_state_epoch_attestations(s)
+
+        ensures updatePubKeyChanges(s)
+                == s.(validators := updatePubKeyChanges(s).validators)
+        ensures is_valid_state_epoch_attestations(updatePubKeyChanges(s))
+    {
+        updatePubKeyChangesHelper(s, |s.validators|)
+
+    }
+
+    function {:vcs_split_on_every_assert} updatePubKeyChangesHelper(s: BeaconState, len: nat) : BeaconState
+        requires len <= |s.balances| == |s.validators| 
+        requires is_valid_state_epoch_attestations(s)
+
+        ensures |updatePubKeyChangesHelper(s,len).validators| == |s.validators|  
+        ensures |updatePubKeyChangesHelper(s, len).balances| == |s.balances| 
+
+        decreases len
+    {
+        if len == 0 then
+            s
+        else
+            var i := len - 1;
+            assert i < |s.validators|;
+
+            var s1 := if (s.validators[i].pubkey != s.validators[i].new_pubkey) && 
+                            (s.validators[i].pubkey_change_epoch == get_current_epoch(s)) then
+                            var new_validator := s.validators[i].(pubkey := s.validators[i].new_pubkey,
+                                            pubkey_change_epoch := FAR_FUTURE_EPOCH);
+                            s.(validators := s.validators[i := new_validator])
+                        else s;
+            assert s1.validators[i] == 
+                if (s.validators[i].pubkey != s.validators[i].new_pubkey) && 
+                            (s.validators[i].pubkey_change_epoch == get_current_epoch(s)) then
+                            var new_validator := s.validators[i].(pubkey := s.validators[i].new_pubkey,
+                                            pubkey_change_epoch := FAR_FUTURE_EPOCH);
+                            (s.(validators := s.validators[i := new_validator])).validators[i]
+                        else s.validators[i];              
+            updatePubKeyChangesHelper(s1, len-1)
+    }
 }
