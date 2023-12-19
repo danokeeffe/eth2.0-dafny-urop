@@ -182,6 +182,30 @@ module ProcessOperationsSpec {
             )
     }
 
+    //TODO: Should require at most 1 change per validator in a block.
+    predicate isValidPubKeyChanges(s: BeaconState, bb: BeaconBlockBody)
+        requires minimumActiveValidators(s)
+        requires |s.validators| == |s.balances|
+    {
+        (forall spc :: spc in bb.pubkey_changes ==> 
+            0 <= spc.message.validator_index as int < |s.validators|
+            && spc.message.validator_index as int < |s.validators|
+            && is_active_validator(s.validators[spc.message.validator_index], get_current_epoch(s))
+            && s.validators[spc.message.validator_index].exitEpoch == FAR_FUTURE_EPOCH
+            && !s.validators[spc.message.validator_index].slashed
+            && match s.validators[spc.message.validator_index].withdrawal_credentials {
+                case Bytes(s) => match hash(spc.message.from_bls_pubkey) {
+                    case Bytes(hashedPubkey) =>
+                        s[0] == BeaconChainTypes.BLS_WITHDRAWAL_PREFIX && s[|s|-1] == hashedPubkey[|hashedPubkey|-1]
+                }
+            }
+            && s.validators[spc.message.validator_index].pubkey == spc.message.pubkey
+            && s.validators[spc.message.validator_index].pubkey_enabled
+            && |s.validators[spc.message.validator_index].prev_pubkeys| < MAX_VALIDATOR_PUBKEY_CHANGES
+            && (forall i | 0 <= i < |s.validators[spc.message.validator_index].prev_pubkeys| :: s.validators[spc.message.validator_index].prev_pubkeys[i].pubkey != spc.message.new_pubkey)
+            && s.validators[spc.message.validator_index].pubkey != spc.message.new_pubkey)
+    }
+
     /**
      *  Check preconditions required for a beacon block body to be processed.
      *  
@@ -219,6 +243,17 @@ module ProcessOperationsSpec {
                         bb.attestations),
                     bb.deposits),
                 bb)
+        && isValidPubKeyChanges(
+                updateVoluntaryExits(
+                    updateDeposits(
+                        updateAttestations(
+                            updateAttesterSlashings(
+                                updateProposerSlashings(s, bb.proposer_slashings), 
+                                bb.attester_slashings), 
+                            bb.attestations),
+                        bb.deposits),
+                    bb.voluntary_exits),
+                bb)
     }
 
 
@@ -237,15 +272,17 @@ module ProcessOperationsSpec {
         requires minimumActiveValidators(s)
         requires isValidBeaconBlockBody(s, bb)
 
-        ensures updateOperations(s, bb) == updateVoluntaryExits(
-                                            updateDeposits(
-                                                updateAttestations(
-                                                    updateAttesterSlashings(
-                                                        updateProposerSlashings(s, bb.proposer_slashings), 
-                                                        bb.attester_slashings), 
-                                                    bb.attestations), 
-                                                bb.deposits), 
-                                            bb.voluntary_exits)
+        ensures updateOperations(s, bb) == updatePubKeyChanges(
+                                            updateVoluntaryExits(
+                                                updateDeposits(
+                                                    updateAttestations(
+                                                        updateAttesterSlashings(
+                                                            updateProposerSlashings(s, bb.proposer_slashings), 
+                                                            bb.attester_slashings), 
+                                                        bb.attestations), 
+                                                    bb.deposits), 
+                                                bb.voluntary_exits),
+                                            bb.pubkey_changes)    
 
         ensures updateOperations(s,bb) 
                 == s.(validators := updateOperations(s,bb).validators,
@@ -297,112 +334,23 @@ module ProcessOperationsSpec {
                             bb.deposits), 
                         bb.voluntary_exits);
         
-        s5
+        
+        var s6 := updatePubKeyChanges(s5, bb.pubkey_changes);
+        assert s6 == updatePubKeyChanges(
+                        updateVoluntaryExits(
+                            updateDeposits(
+                                updateAttestations(
+                                    updateAttesterSlashings(
+                                        updateProposerSlashings(s, bb.proposer_slashings),
+                                        bb.attester_slashings),
+                                    bb.attestations),
+                                bb.deposits),                            
+                            bb.voluntary_exits),
+                        bb.pubkey_changes);
+        s6
     }
 
-
-    method updatePubKeyChangesSeq(s: BeaconState, signedPubKeyChanges: seq<SignedPubKeyChange>) returns (finalState: BeaconState)
-        requires forall spc :: spc in signedPubKeyChanges ==> 
-        0 <= spc.message.validator_index as int < |s.validators|
-        && spc.message.validator_index as int < |s.validators|
-        && is_active_validator(s.validators[spc.message.validator_index], get_current_epoch(s))
-        && s.validators[spc.message.validator_index].exitEpoch == FAR_FUTURE_EPOCH
-        && !s.validators[spc.message.validator_index].slashed
-        && match s.validators[spc.message.validator_index].withdrawal_credentials {
-            case Bytes(s) => match hash(spc.message.from_bls_pubkey) {
-                case Bytes(hashedPubkey) =>
-                    s[0] == BeaconChainTypes.BLS_WITHDRAWAL_PREFIX && s[|s|-1] == hashedPubkey[|hashedPubkey|-1]
-            }
-        }
-        && s.validators[spc.message.validator_index].pubkey == spc.message.pubkey
-        && |s.validators[spc.message.validator_index].prev_pubkeys| < MAX_VALIDATOR_PUBKEY_CHANGES
-        && (forall i | 0 <= i < |s.validators[spc.message.validator_index].prev_pubkeys| :: s.validators[spc.message.validator_index].prev_pubkeys[i] != spc.message.new_pubkey)
-        && s.validators[spc.message.validator_index].pubkey != spc.message.new_pubkey
-        decreases |signedPubKeyChanges|
-    {  
-        if |signedPubKeyChanges| == 0 {
-            finalState := s;
-        } else {
-            var updatedState := updatePubKeyChanges(s, signedPubKeyChanges[0]);
-            finalState := updatePubKeyChangesSeq(updatedState, signedPubKeyChanges[1..]);
-        }
-    }
-
-    method updatePubKeyChanges(s: BeaconState, signed_pubkey_change: SignedPubKeyChange) returns (state: BeaconState)
-         requires signed_pubkey_change.message.validator_index as int < |s.validators|    // 1st assert in Revoke mainnet.py
-         requires is_active_validator(s.validators[signed_pubkey_change.message.validator_index], get_current_epoch(s)) // 2nd assert in Revoke mainnet.py
-         requires s.validators[signed_pubkey_change.message.validator_index].exitEpoch == FAR_FUTURE_EPOCH // 3rd assert in Revoke mainnet.py
-         requires !s.validators[signed_pubkey_change.message.validator_index].slashed  // 4th assert in Revoke mainnet.py
-         requires 
-         
-         match s.validators[signed_pubkey_change.message.validator_index].withdrawal_credentials {
-               case Bytes(s) => match hash(signed_pubkey_change.message.from_bls_pubkey) {
-                                      case Bytes(hashedPubkey) =>
-                                                 s[0] == BeaconChainTypes.BLS_WITHDRAWAL_PREFIX && s[|s|-1] == hashedPubkey[|hashedPubkey|-1] 
-                                }
-        }
-
-        // Adding 5th and 6th assert in Revoke mainnet.py
-        // Used a nested "match" here since "s.validators[signed_pubkey_change.message.validator_index].withdrawal_credentials" type is Bytes32
-        // Also hash(signed_pubkey_change.message.from_bls_pubkey) type is Bytes32 and both need to be indexed
-
-        requires s.validators[signed_pubkey_change.message.validator_index].pubkey == signed_pubkey_change.message.pubkey // 7th assert in Revoke mainnet.py
-        requires |s.validators[signed_pubkey_change.message.validator_index].prev_pubkeys| < MAX_VALIDATOR_PUBKEY_CHANGES // 8th assert in Revoke mainnet.py
-        requires (forall i | 0 <= i < |s.validators[signed_pubkey_change.message.validator_index].prev_pubkeys| :: s.validators[signed_pubkey_change.message.validator_index].prev_pubkeys[i] != signed_pubkey_change.message.new_pubkey)  // 9th assert in Revoke mainnet.py
-        //requires bls.Verify(signed_pubkey_change.message.from_bls_pubkey, compute_signing_root(signed_pubkey_change.message, get_domain(s, DOMAIN_PUBKEY_CHANGE)), signed_pubkey_change.signature)
-
-        requires 0 <= signed_pubkey_change.message.validator_index as int < |s.validators|                                    // Precondition to fix initiate_pubkey_change error
-        requires s.validators[signed_pubkey_change.message.validator_index].pubkey != signed_pubkey_change.message.new_pubkey // Precondition to fix initiate_pubkey_change error
-    {
-        var newState: BeaconState := initiate_pubkey_change(s, signed_pubkey_change.message.validator_index, signed_pubkey_change.message.new_pubkey);
-        return newState;
-    }
-
-    method initiate_pubkey_change(s: BeaconState, index: ValidatorIndex, new_pubkey: BLSPubkey) returns (newState: BeaconState)
-        requires 0 <= index as int < |s.validators|
-        requires s.validators[index].pubkey != new_pubkey
-    {
-        var new_validator: Validator := Validator (    // Making new Validator since s.validators[index] is immutable
-            s.validators[index].pubkey,
-            s.validators[index].effective_balance,
-            s.validators[index].slashed,
-            s.validators[index].activation_eligibility_epoch,
-            s.validators[index].activation_epoch,
-            s.validators[index].exitEpoch,
-            s.validators[index].withdrawable_epoch,
-            s.validators[index].withdrawal_credentials,
-            new_pubkey,                                 // Updated field
-            get_current_epoch(s) + PUBKEY_CHANGE_DELAY, // Updated field
-            s.validators[index].prev_pubkeys      
-        );
-
-        var new_validators: seq<Validator> := s.validators[0..index] + [new_validator] + s.validators[index+1..]; // Making new s.validators[]
-        // Create seq<Validators> of objects from 0-index, concat new_validators to it, then add objects from index+1 to end
-
-        newState := BeaconState ( // Make new beacon state object since BeaconState is also immutable
-            s.genesis_time,
-            s.slot,
-            s.latest_block_header,
-            s.block_roots,
-            s.state_roots,
-            s.historical_roots,
-            s.eth1_data,
-            s.eth1_data_votes,
-            s.eth1_deposit_index,
-            new_validators,  // Updated validators
-            s.balances,
-            s.randao_mixes,
-            s.slashings,
-            s.previous_epoch_attestations,
-            s.current_epoch_attestations,
-            s.justification_bits,
-            s.previous_justified_checkpoint,
-            s.current_justified_checkpoint,
-            s.finalised_checkpoint
-        );
-
-        return newState;
-    }
+ 
 
     /**
      *  The functional equivalent of process_proposer_slashing.
@@ -1078,6 +1026,105 @@ module ProcessOperationsSpec {
             assert minimumActiveValidators(s2);
 
             s2
+    }
+
+
+       function {:vcs_split_on_every_assert} updatePubKeyChanges(s: BeaconState, spkcs : seq<SignedPubKeyChange>) : BeaconState
+        requires minimumActiveValidators(s)
+        requires |s.validators| == |s.balances| 
+        requires forall spc :: spc in spkcs ==> 
+            0 <= spc.message.validator_index as int < |s.validators|
+            && spc.message.validator_index as int < |s.validators|
+            && is_active_validator(s.validators[spc.message.validator_index], get_current_epoch(s))
+            && s.validators[spc.message.validator_index].exitEpoch == FAR_FUTURE_EPOCH
+            && !s.validators[spc.message.validator_index].slashed
+            && match s.validators[spc.message.validator_index].withdrawal_credentials {
+                case Bytes(s) => match hash(spc.message.from_bls_pubkey) {
+                    case Bytes(hashedPubkey) =>
+                        s[0] == BeaconChainTypes.BLS_WITHDRAWAL_PREFIX && s[|s|-1] == hashedPubkey[|hashedPubkey|-1]
+                }
+            }
+            && s.validators[spc.message.validator_index].pubkey == spc.message.pubkey
+            && s.validators[spc.message.validator_index].pubkey_enabled
+            && |s.validators[spc.message.validator_index].prev_pubkeys| < MAX_VALIDATOR_PUBKEY_CHANGES
+            && (forall i | 0 <= i < |s.validators[spc.message.validator_index].prev_pubkeys| :: s.validators[spc.message.validator_index].prev_pubkeys[i].pubkey != spc.message.new_pubkey)
+            && s.validators[spc.message.validator_index].pubkey != spc.message.new_pubkey
+
+        ensures |updatePubKeyChanges(s,spkcs).validators| == |s.validators| == |updatePubKeyChanges(s,spkcs).balances|
+        ensures updatePubKeyChanges(s,spkcs).slot == s.slot
+        ensures updatePubKeyChanges(s, spkcs).latest_block_header == s.latest_block_header
+        ensures get_current_epoch(updatePubKeyChanges(s, spkcs)) == get_current_epoch(s)
+        ensures forall i :: 0 <= i < |s.validators| 
+                ==> updatePubKeyChanges(s, spkcs).validators[i].activation_epoch == s.validators[i].activation_epoch
+        ensures updatePubKeyChanges(s, spkcs) == s.(validators := updatePubKeyChanges(s, spkcs).validators)
+        ensures minimumActiveValidators(updatePubKeyChanges(s, spkcs))
+        //ensures forall spc :: spc in spkcs ==>
+        //    is_active_validator(updatePubKeyChanges(s, spkcs).validators[spc.message.validator_index], get_current_epoch(updatePubKeyChanges(s, spkcs)))
+        //    && updatePubKeyChanges(s, spkcs).validators[spc.message.validator_index].exitEpoch == FAR_FUTURE_EPOCH
+        decreases |spkcs|
+    {
+        if |spkcs| == 0 then
+            s
+        else
+            assert minimumActiveValidators(s);
+            assert spkcs[|spkcs|-1].message.validator_index as int < |s.validators|;
+            var spkc := spkcs[|spkcs|-1];
+            assert is_active_validator(s.validators[spkc.message.validator_index], get_current_epoch(s));
+            var s1 := updatePubKeyChange(s, spkc);
+            assert is_active_validator(s1.validators[spkc.message.validator_index], get_current_epoch(s1));
+            assert minimumActiveValidators(s1);
+
+            var spkc_rest := spkcs[..|spkcs|-1];
+            assert |spkc_rest| < |spkcs|;
+            var s2 := updatePubKeyChanges(s1, spkc_rest);
+            assert |s2.validators| == |s2.balances| == |s1.validators|;
+            /*
+            assert forall i :: 0 <= i < |s.validators| 
+                    ==> s1.validators[i].activation_epoch == s.validators[i].activation_epoch;
+            */
+
+            assert minimumActiveValidators(s2);
+            s2
+    }
+
+    function updatePubKeyChange(s: BeaconState, spkc: SignedPubKeyChange) : BeaconState
+        requires minimumActiveValidators(s)
+        requires spkc.message.validator_index as int < |s.validators|    // 1st assert in Revoke mainnet.py
+        requires is_active_validator(s.validators[spkc.message.validator_index], get_current_epoch(s)) // 2nd assert in Revoke mainnet.py
+        requires s.validators[spkc.message.validator_index].exitEpoch == FAR_FUTURE_EPOCH // 3rd assert in Revoke mainnet.py
+        requires !s.validators[spkc.message.validator_index].slashed  // 4th assert in Revoke mainnet.py
+        requires 
+         
+        match s.validators[spkc.message.validator_index].withdrawal_credentials {
+            case Bytes(s) => match hash(spkc.message.from_bls_pubkey) {
+                                      case Bytes(hashedPubkey) =>
+                                                 s[0] == BeaconChainTypes.BLS_WITHDRAWAL_PREFIX && s[|s|-1] == hashedPubkey[|hashedPubkey|-1] 
+                            }
+        }
+
+        // Adding 5th and 6th assert in Revoke mainnet.py
+        // Used a nested "match" here since "s.validators[signed_pubkey_change.message.validator_index].withdrawal_credentials" type is Bytes32
+        // Also hash(signed_pubkey_change.message.from_bls_pubkey) type is Bytes32 and both need to be indexed
+
+        requires s.validators[spkc.message.validator_index].pubkey == spkc.message.pubkey // 7th assert in Revoke mainnet.py
+        requires |s.validators[spkc.message.validator_index].prev_pubkeys| < MAX_VALIDATOR_PUBKEY_CHANGES // 8th assert in Revoke mainnet.py
+        requires (forall i | 0 <= i < |s.validators[spkc.message.validator_index].prev_pubkeys| :: s.validators[spkc.message.validator_index].prev_pubkeys[i].pubkey != spkc.message.new_pubkey)  // 9th assert in Revoke mainnet.py
+        //requires bls.Verify(signed_pubkey_change.message.from_bls_pubkey, compute_signing_root(signed_pubkey_change.message, get_domain(s, DOMAIN_PUBKEY_CHANGE)), signed_pubkey_change.signature)
+
+        requires 0 <= spkc.message.validator_index as int < |s.validators|                                    // Precondition to fix initiate_pubkey_change error
+        requires s.validators[spkc.message.validator_index].pubkey != spkc.message.new_pubkey // Precondition to fix initiate_pubkey_change error
+        requires |s.validators| == |s.balances|
+        //requires is_active_validator(s.validators[spkc.message.validator_index], get_current_epoch(s)) // 2nd assert in Revoke mainnet.py
+        ensures |updatePubKeyChange(s, spkc).validators| == |updatePubKeyChange(s, spkc).balances| == |s.validators|
+        ensures updatePubKeyChange(s, spkc).validators[spkc.message.validator_index].exitEpoch == FAR_FUTURE_EPOCH // 3rd assert in Revoke mainnet.py
+        ensures updatePubKeyChange(s,spkc) 
+                == s.(validators := updatePubKeyChange(s,spkc).validators)
+        ensures minimumActiveValidators(updatePubKeyChange(s, spkc))
+    {
+        
+        var s1 := initiate_pubkey_change(s, spkc.message.validator_index, spkc.message.new_pubkey);
+        assert minimumActiveValidators(s1);
+        s1
     }
     
 }

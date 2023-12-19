@@ -65,7 +65,8 @@ module Constants {
 
   const GENESIS_SLOT := 0 as Slot              
   const GENESIS_EPOCH := 0 as Epoch  
-  const FAR_FUTURE_EPOCH := (TWO_UP_64 - 1) as Epoch  
+  const FAR_FUTURE_EPOCH := (TWO_UP_64 - 1) as Epoch
+  const FAR_FUTURE_SLOT := (TWO_UP_64 - 1) as Slot  
 
   // (Non-configurable) constants
 

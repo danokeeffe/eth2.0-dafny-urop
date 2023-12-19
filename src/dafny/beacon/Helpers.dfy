@@ -958,6 +958,98 @@ module BeaconHelpers {
                                                                 withdrawable_epoch := (exit_queue_epoch as nat + MIN_VALIDATOR_WITHDRAWABILITY_DELAY as nat) as Epoch)])
     }
 
+
+    function method initiate_pubkey_change(s: BeaconState, index: ValidatorIndex, newpubkey: BLSPubkey) : BeaconState
+        requires |s.validators| == |s.balances|
+        requires index as int < |s.validators| 
+        requires minimumActiveValidators(s)
+        requires is_active_validator(s.validators[index], get_current_epoch(s))
+        
+        ensures |s.validators| == |initiate_pubkey_change(s,index,newpubkey).validators|
+        ensures |s.balances| == |initiate_pubkey_change(s,index,newpubkey).balances|
+        ensures |initiate_pubkey_change(s,index, newpubkey).validators| == |initiate_pubkey_change(s,index,newpubkey).balances|
+        ensures |initiate_pubkey_change(s,index,newpubkey).validators| 
+                == |initiate_pubkey_change(s,index,newpubkey).balances| 
+        ensures forall i :: (0 <= i < |s.validators|) ==> 
+                initiate_pubkey_change(s,index,newpubkey).validators[i].exitEpoch == s.validators[i].exitEpoch
+        ensures forall i :: (0 <= i < |s.validators|) && (i != index as nat) ==> 
+                initiate_pubkey_change(s,index,newpubkey).validators[i] == s.validators[i]
+        ensures initiate_pubkey_change(s,index,newpubkey).slot == s.slot
+        ensures initiate_pubkey_change(s,index,newpubkey).latest_block_header == s.latest_block_header
+        ensures minimumActiveValidators(initiate_pubkey_change(s,index, newpubkey))
+        ensures initiate_pubkey_change(s,index,newpubkey) == s.(validators := initiate_pubkey_change(s,index,newpubkey).validators)
+    {
+
+        var validator : Validator := s.validators[index];
+
+        var span: PKSpan := PKSpan(validator.pubkey, validator.pubkey_init_slot, validator.pubkey_enabled_slot);
+
+        assert minimumActiveValidators(s);
+
+        
+        var new_validator: Validator := Validator (    // Making new Validator since s.validators[index] is immutable
+            validator.pubkey,
+            validator.effective_balance,
+            validator.slashed,
+            validator.activation_eligibility_epoch,
+            validator.activation_epoch,
+            validator.exitEpoch,
+            validator.withdrawable_epoch,
+            validator.withdrawal_credentials,
+            newpubkey,                                 // Updated field
+            get_current_epoch(s) + PUBKEY_CHANGE_DELAY, // Updated field
+            validator.prev_pubkeys + [span],
+            s.slot,
+            FAR_FUTURE_SLOT,
+            false      
+        );
+        /*
+        var new_validator: Validator := Validator (    // Making new Validator since s.validators[index] is immutable
+            validator.pubkey,
+            validator.effective_balance,
+            validator.slashed,
+            validator.activation_eligibility_epoch,
+            validator.activation_epoch,
+            validator.exitEpoch,
+            validator.withdrawable_epoch,
+            validator.withdrawal_credentials,
+            validator.new_pubkey,                                 // Updated field
+            validator.pubkey_change_epoch, // Updated field
+            validator.prev_pubkeys,
+            validator.pubkey_init_slot,
+            validator.pubkey_enabled_slot,
+            validator.pubkey_enabled      
+        );*/
+        var new_validators: seq<Validator> := s.validators[0..index] + [new_validator] + s.validators[index+1..]; // Making new s.validators[]
+        // Create seq<Validators> of objects from 0-index, concat new_validators to it, then add objects from index+1 to end
+
+        var s1 := BeaconState ( // Make new beacon state object since BeaconState is also immutable
+            s.genesis_time,
+            s.slot,
+            s.latest_block_header,
+            s.block_roots,
+            s.state_roots,
+            s.historical_roots,
+            s.eth1_data,
+            s.eth1_data_votes,
+            s.eth1_deposit_index,
+            new_validators,  // Updated validators
+            s.balances,
+            s.randao_mixes,
+            s.slashings,
+            s.previous_epoch_attestations,
+            s.current_epoch_attestations,
+            s.justification_bits,
+            s.previous_justified_checkpoint,
+            s.current_justified_checkpoint,
+            s.finalised_checkpoint
+        );
+
+        assert is_active_validator(s1.validators[index], get_current_epoch(s1));
+        assert minimumActiveValidators(s1);
+        s1
+
+    }
     /** 
      *  Slash the validator with index ``slashed_index``.
      *
@@ -1806,6 +1898,7 @@ module BeaconHelpers {
                 get_inactivity_penalty_deltas_helper(s, eligible_indices[1..], target_indices, rewards, penalties')
     }
 
+
     /** 
      * Return attestation reward/penalty deltas for each validator.
      *
@@ -1932,13 +2025,17 @@ module BeaconHelpers {
                 d.data.withdrawal_credentials,
                 d.data.pubkey,
                 FAR_FUTURE_EPOCH,
-                []
+                [],
+                FAR_FUTURE_SLOT, //TODO: Revoke - really?
+                FAR_FUTURE_SLOT,
+                true
         )
     }
     
+
     /** The default Validator. */
     const DEFAULT_VALIDATOR := Validator(
-        DEFAULT_BYTES48, 0, false, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, DEFAULT_BYTES32, DEFAULT_BYTES48, FAR_FUTURE_EPOCH, []
+        DEFAULT_BYTES48, 0, false, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, FAR_FUTURE_EPOCH, DEFAULT_BYTES32, DEFAULT_BYTES48, FAR_FUTURE_EPOCH, [], FAR_FUTURE_SLOT, FAR_FUTURE_SLOT, true
         // Added DEFAULT_BYTES48 to new_pubkey argument
         // Added FAR_FUTURE_EPOCH to pubkey_change_epoch argument
         // Added DEFAULT_BYTES32 to withdrawal_credentials
