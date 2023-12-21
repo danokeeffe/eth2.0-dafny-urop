@@ -101,6 +101,23 @@ module BeaconHelperSpec {
     }
 
     /**
+     *  Extract the list of validators from a sequence of signed pubkey changes
+     *
+     *  @param      spkcs  A list of signed pubkey changes.
+     *  @returns        The sequence of validator indices for spkcs as ints.
+     *
+     *  @note           Return index type could be changed to uint64 but int
+     *                  was used here for convenience.
+     */
+    function get_SignedPubKeyChanges_validator_indices(spkcs: seq<SignedPubKeyChange>): seq<int>
+        ensures |get_SignedPubKeyChanges_validator_indices(spkcs)| == |spkcs|
+    {
+        if |spkcs| == 0 then []
+        else [spkcs[0].message.validator_index as int] + get_SignedPubKeyChanges_validator_indices(spkcs[1..])
+    }
+
+
+    /**
      *  Sorted intersection of two sets of sorted validator indices.
      *
      *  @param      a   A sorted list of validators.
