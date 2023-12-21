@@ -355,5 +355,158 @@ module ProcessOperationsProofs {
         assert forall i :: 0 <= i < |ve[..|ve|-1]| 
                 ==> get_VolExit_validator_indices(ve[..|ve|-1])[i] == ve[i].validator_index as int;
     }
+
+
+   /**
+     *  This lemma links the indices in spkcs to those in get_SignedPKC_validator_indices.
+     *
+     *  @param  spkcs  A sequence of pubkey changes. 
+     *  @return     The proof that forall i :: 0 <= i < |spkcs| we have that 
+     *              get_SignedPKC_validator_indices(spkcs)[i] == spkcs[i].validator_index.
+     */
+    lemma mappingSignedPubKeyChangesIndices(spkcs: seq<SignedPubKeyChange>)
+        ensures forall i :: 0 <= i < |spkcs| 
+            ==> get_SignedPubKeyChanges_validator_indices(spkcs)[i] == spkcs[i].message.validator_index as int
+    { //Thanks Dafny
+    }
+
+
+    /**
+     *  This lemma shows that applying get_SignedPubKeyChanges_validator_indices to a subset of spkcs
+     *  is equivalent to taking the same length subset of get_SignedPubKeyChanges_validator_indices(spkcs).
+     *
+     *  @param  spkcs  A sequence of signed pubkey changes. 
+     *  @param  i   A positive integer. 
+     *  @return     The proof that if 0 <= i < |spkcs| then get_SignedPubKeyChanges_validator_indices(spkcs[..i]) 
+     *              == get_SignedPubKeyChanges_validator_indices(spkcs)[..i].
+     */
+    lemma subsetMappingSignedPubKeyChangesIndices(spkcs: seq<SignedPubKeyChange>, i : nat)
+        requires 0 <= i < |spkcs|
+        ensures get_SignedPubKeyChanges_validator_indices(spkcs[..i]) == get_SignedPubKeyChanges_validator_indices(spkcs)[..i]
+    {
+        if |spkcs| == 0 {}
+        else {
+            assert spkcs == spkcs[..i] + spkcs[i..];
+            mappingSignedPubKeyChangesIndices(spkcs[..i]);
+            assert forall j :: 0 <= j < |spkcs[..i]| 
+                    ==> get_SignedPubKeyChanges_validator_indices(spkcs[..i])[j] == spkcs[j].message.validator_index as int;
+            mappingSignedPubKeyChangesIndices(spkcs);
+            assert forall j :: 0 <= j < |spkcs| 
+                    ==> get_SignedPubKeyChanges_validator_indices(spkcs)[j] == spkcs[j].message.validator_index as int;
+        }
+    }
     
+    /**
+     *  This lemma shows that a validator remains unchanged in a new state (this proof is needed 
+     *  within updateSignedPubKeyChanges).
+     *
+     *  @param  s       A beacon state. 
+     *  @param  s1      A beacon state. 
+     *  @param  spkcs1     A sequence of pubkey changes. 
+     *  @param  spkc2     A pubkey change. 
+     *  @param  spkcs      A sequence of pubkey changes. 
+     *  @return         The proof that various preconditions relating s, s1, spkcs1, spkc2 and spkcs 
+     *                  apply, then s1.validators[spkc2.message.validator_index] 
+     *                  == s.validators[spkc2.message.validator_index].
+     */
+    lemma SPKCHelperLemma1(s: BeaconState, 
+                         s1: BeaconState, 
+                         spkcs1: seq<SignedPubKeyChange>, 
+                         spkc2: SignedPubKeyChange, 
+                         spkcs: seq<SignedPubKeyChange>
+                        )
+        requires |spkcs1| == |spkcs|-1
+        requires spkcs1 == spkcs[..|spkcs|-1]
+        requires spkc2 == spkcs[|spkcs|-1]
+        requires forall i,j :: 0 <= i < j < |spkcs| && i != j 
+                    ==> spkcs[i].message.validator_index!= spkcs[j].message.validator_index 
+        requires forall i :: 0 <= i < |spkcs1| ==> spkcs1[i].message.validator_index as int < |s.validators| 
+        requires spkc2.message.validator_index as int < |s.validators| 
+        requires |s1.validators| == |s.validators|
+        requires forall i :: 0 <= i < |s.validators| && i !in get_SignedPubKeyChanges_validator_indices(spkcs1) 
+                    ==> s1.validators[i] == s.validators[i]
+        requires spkc2 !in spkcs1
+
+        ensures s1.validators[spkc2.message.validator_index] == s.validators[spkc2.message.validator_index]
+    {
+        seqInitLast<SignedPubKeyChange>(spkcs, |spkcs|-1);
+        assert spkcs[..|spkcs|-1] + [spkcs[|spkcs|-1]] == spkcs[..|spkcs|];
+        assert spkcs[..|spkcs|] == spkcs;
+        assert spkcs1 + [spkc2] == spkcs;
+        
+        mappingSignedPubKeyChangesIndices(spkcs1);
+        assert forall i :: 0 <= i < |spkcs1| 
+                ==> get_SignedPubKeyChanges_validator_indices(spkcs1)[i] == spkcs1[i].message.validator_index as int;
+        assert forall i :: 0 <= i < |spkcs[..|spkcs|-1]| 
+                ==> spkcs[i].message.validator_index != spkcs[|spkcs|-1].message.validator_index ;
+        assert spkc2.message.validator_index as int !in get_SignedPubKeyChanges_validator_indices(spkcs1);
+    }
+
+
+   /**
+     *  This lemma shows that a validator remains unchanged in a new state (this proof is needed 
+     *  within updateSignedPubKeyChanges).
+     *
+     *  @param  s       A beacon state. 
+     *  @param  s1      A beacon state. 
+     *  @param  spkcs1     A sequence of pubkey changes. 
+     *  @param  spkc2     A pubkey change. 
+     *  @param  spkcs      A sequence of pubkey changes. 
+     *  @return         The proof that various preconditions relating s, s1, spkcs1, spkc2 and spkcs 
+     *                  apply, then s2.validators[i] == s.validators[i].
+     */
+    lemma SPKCHelperLemma2(s: BeaconState, 
+                         s1: BeaconState, 
+                        spkcs1: seq<SignedPubKeyChange>, 
+                        spkc2: SignedPubKeyChange, 
+                        spkcs: seq<SignedPubKeyChange>
+                       )
+        requires |spkcs1| == |spkcs|-1
+        requires spkcs1 == spkcs[..|spkcs|-1]
+        requires spkc2 == spkcs[|spkcs|-1]
+        requires forall i,j :: 0 <= i < j < |spkcs| && i != j 
+                    ==> spkcs[i].message.validator_index!= spkcs[j].message.validator_index 
+        requires forall i :: 0 <= i < |spkcs1| ==> spkcs1[i].message.validator_index as int < |s.validators| 
+        requires spkc2.message.validator_index as int < |s.validators| 
+        requires |s1.validators| == |s.validators|
+        requires forall i :: 0 <= i < |s.validators| 
+                && i !in (get_SignedPubKeyChanges_validator_indices(spkcs1) + [spkc2.message.validator_index as int]) 
+                ==> s1.validators[i] == s.validators[i]
+        
+        ensures forall i :: 0 <= i < |s.validators| && i !in get_SignedPubKeyChanges_validator_indices(spkcs) 
+                ==> s1.validators[i] == s.validators[i]
+    {
+        seqInitLast<SignedPubKeyChange>(spkcs, |spkcs|-1);
+        assert spkcs[..|spkcs|-1] + [spkcs[|spkcs|-1]] == spkcs[..|spkcs|];
+        assert spkcs[..|spkcs|] == spkcs;
+        assert spkcs1 + [spkc2] == spkcs;
+        
+        subsetMappingSignedPubKeyChangesIndices(spkcs,|spkcs|-1);
+        assert spkcs1 == spkcs[..|spkcs|-1];
+        assert get_SignedPubKeyChanges_validator_indices(spkcs[..|spkcs|-1]) 
+                == get_SignedPubKeyChanges_validator_indices(spkcs1) 
+                == get_SignedPubKeyChanges_validator_indices(spkcs)[..|spkcs|-1];
+
+        mappingSignedPubKeyChangesIndices(spkcs);
+        assert forall i :: 0 <= i < |spkcs| 
+                ==> get_SignedPubKeyChanges_validator_indices(spkcs)[i] == spkcs[i].message.validator_index as int;
+        assert get_SignedPubKeyChanges_validator_indices(spkcs)[|spkcs|-1] 
+                == spkcs[|spkcs|-1].message.validator_index as int 
+                == spkc2.message.validator_index as int;
+        assert get_SignedPubKeyChanges_validator_indices(spkcs)[..|spkcs|-1] + [get_SignedPubKeyChanges_validator_indices(spkcs)[|spkcs|-1]] 
+                == get_SignedPubKeyChanges_validator_indices(spkcs);
+        assert get_SignedPubKeyChanges_validator_indices(spkcs1) + [spkc2.message.validator_index as int] 
+                == get_SignedPubKeyChanges_validator_indices(spkcs);
+    }
+
+    lemma SPKCHelperLemma3(spkcs : seq<SignedPubKeyChange>)
+        requires |spkcs| > 0
+        requires forall i,j :: 0 <= i < j < |spkcs| && i != j
+                ==> spkcs[i].message.validator_index != spkcs[j].message.validator_index
+        ensures spkcs[|spkcs|-1].message.validator_index as int !in get_SignedPubKeyChanges_validator_indices(spkcs[..|spkcs|-1])
+    {
+        mappingSignedPubKeyChangesIndices(spkcs[..|spkcs|-1]);
+        assert forall i :: 0 <= i < |spkcs[..|spkcs|-1]| 
+                ==> get_SignedPubKeyChanges_validator_indices(spkcs[..|spkcs|-1])[i] == spkcs[i].message.validator_index as int;
+    }
 }
