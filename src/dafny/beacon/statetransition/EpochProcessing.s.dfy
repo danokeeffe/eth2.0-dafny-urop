@@ -192,7 +192,7 @@ module EpochProcessingSpec {
                             )
                         )
                     );
-
+        assert |s8.validators| == |s8.balances| == |s.validators|;
         var s9 := updateHistoricalRoots(s8);
         assert s9 == updateHistoricalRoots(
                         updateRandaoMixes(
@@ -1379,6 +1379,7 @@ module EpochProcessingSpec {
         else s
     }
 
+
     /**
      *  The functional equivalent of process_participation_record_updates.
      *
@@ -1401,7 +1402,6 @@ module EpochProcessingSpec {
         )
     }
 
-
     function {:vcs_split_on_every_assert} updatePubKeyChanges(s: BeaconState) : BeaconState
         requires |s.validators| == |s.balances|
         requires is_valid_state_epoch_attestations(s)
@@ -1420,7 +1420,23 @@ module EpochProcessingSpec {
 
         ensures |updatePubKeyChangesHelper(s,len).validators| == |s.validators|  
         ensures |updatePubKeyChangesHelper(s, len).balances| == |s.balances| 
-
+        ensures 
+            var updatedState := updatePubKeyChangesHelper(s, len);
+            |updatedState.validators| == |s.validators| 
+            && |updatedState.balances| == |s.balances|
+            && updatedState == s.(validators := updatedState.validators) 
+            && is_valid_state_epoch_attestations(updatedState)
+             /*
+        ensures forall v :: 0 <= v < len ==>
+            assert v < |s.validators|;
+           
+            var new_validator := if (s.validators[v].pubkey != s.validators[v].new_pubkey && 
+                            s.validators[v].pubkey_change_epoch == get_current_epoch(s)) then
+                            s.validators[v].(pubkey := s.validators[v].new_pubkey,
+                                            pubkey_change_epoch := FAR_FUTURE_EPOCH)
+                        else s.validators[v];
+            updatePubKeyChangesHelper(s, len).validators[v] == new_validator
+            */
         decreases len
     {
         if len == 0 then
@@ -1430,18 +1446,35 @@ module EpochProcessingSpec {
             assert i < |s.validators|;
 
             var s1 := if (s.validators[i].pubkey != s.validators[i].new_pubkey) && 
-                            (s.validators[i].pubkey_change_epoch == get_current_epoch(s)) then
+                            (s.validators[i].pubkey_change_epoch <= get_current_epoch(s)) then
                             var new_validator := s.validators[i].(pubkey := s.validators[i].new_pubkey,
                                             pubkey_change_epoch := FAR_FUTURE_EPOCH);
                             s.(validators := s.validators[i := new_validator])
                         else s;
             assert s1.validators[i] == 
                 if (s.validators[i].pubkey != s.validators[i].new_pubkey) && 
-                            (s.validators[i].pubkey_change_epoch == get_current_epoch(s)) then
+                            (s.validators[i].pubkey_change_epoch <= get_current_epoch(s)) then
                             var new_validator := s.validators[i].(pubkey := s.validators[i].new_pubkey,
                                             pubkey_change_epoch := FAR_FUTURE_EPOCH);
                             (s.(validators := s.validators[i := new_validator])).validators[i]
-                        else s.validators[i];              
-            updatePubKeyChangesHelper(s1, len-1)
+                        else s.validators[i]; 
+
+            assert forall v :: 0 <= v < i ==> s1.validators[v] == s.validators[v];
+            assert forall v :: i < v < |s.validators| ==> s1.validators[v] == s.validators[v];
+            //assert forall v :: 0 <= v < |s.validators| 
+            //        ==> s1.validators[v]  == s.validators[v];
+            assert |s1.balances| == |s1.validators|;
+            assert (s.validators[i].pubkey == s.validators[i].new_pubkey || s.validators[i].pubkey_change_epoch > get_current_epoch(s)) ==> s.validators[i] == s1.validators[i];
+
+            AssumeIsValidStateEpoch_Attestations(s1);             
+            var s2 := updatePubKeyChangesHelper(s1, len-1);
+            AssumeIsValidStateEpoch_Attestations(s2);
+            assert |s2.balances| == |s2.validators| == |s1.validators| == |s.validators|;
+            assert forall v :: i < v < |s.validators| ==> s1.validators[v] == s.validators[v];
+            //assert forall v :: i < v < |s1.validators| ==> s2.validators[v] == s1.validators[v];
+            //assert forall v :: i < v < |s2.validators| ==> s2.validators[v].pubkey == s1.validators[v].pubkey;
+
+            s2
     }
+    
 }

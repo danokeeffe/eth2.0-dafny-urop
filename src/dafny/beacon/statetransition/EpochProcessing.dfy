@@ -820,6 +820,7 @@ module EpochProcessing {
         );
     }
     
+    
     method process_pubkey_change_updates(s: BeaconState) returns (s' : BeaconState)
         requires |s.validators| == |s.balances|
         requires is_valid_state_epoch_attestations(s)
@@ -837,7 +838,7 @@ module EpochProcessing {
         {
             var validator := s.validators[i];
             if validator.pubkey != validator.new_pubkey {
-                if validator.pubkey_change_epoch == get_current_epoch(s') {
+                if validator.pubkey_change_epoch <= get_current_epoch(s') {
                     validator := validator.(pubkey := validator.new_pubkey,
                                             pubkey_change_epoch := FAR_FUTURE_EPOCH);
                     s' := s'.( validators := s'.validators[i := validator]);
@@ -847,5 +848,4 @@ module EpochProcessing {
         } 
      
     }
-
 }
